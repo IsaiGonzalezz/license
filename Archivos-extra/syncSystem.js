@@ -11,6 +11,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const checkSystemStatus = async (req, res) => {
     try {
         const softwareName = process.env.SOFTWARE_NAME;
+        // syncSystem internamente debería llamar a tu nuevo timeGuard numérico
         const result = await license.syncSystem(softwareName);
 
         // CASO A: No hay licencia (Instalación limpia)
@@ -64,7 +65,7 @@ const activateSystem = async (req, res) => {
         const result = await license.syncSystem(softwareName, licencia);
 
         if (!result.isValid) {
-            console.log("LA NUBE RECHAZÓ LA LLAVE POR ESTE MOTIVO:", result.error);
+            console.log("🚨 LA NUBE RECHAZÓ LA LLAVE POR ESTE MOTIVO:", result.error);
             return res.status(401).json({
                 success: false,
                 error: result.error,
@@ -85,4 +86,36 @@ const activateSystem = async (req, res) => {
     }
 };
 
-module.exports = { checkSystemStatus, activateSystem };
+
+
+const getLicenseWidgetData = async (req, res) => {
+    try {
+        const identity = await license.getLocalIdentity();
+        
+        if (!identity || !identity.endAccess) {
+            return res.status(200).json({ success: false, message: "No se encontró licencia local" });
+        }
+
+        const hoy = new Date();
+        const fechaFin = new Date(identity.endAccess);
+
+        hoy.setHours(0, 0, 0, 0);
+        fechaFin.setHours(0, 0, 0, 0);
+        
+        // 3. Calculamos la diferencia y usamos Math.round para el día exacto
+        const diferenciaMs = fechaFin.getTime() - hoy.getTime();
+        const diasRestantes = Math.round(diferenciaMs / (1000 * 60 * 60 * 24));
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                diasRestantes: diasRestantes > 0 ? diasRestantes : 0,
+                fechaExpiracion: identity.endAccess
+            }
+        });
+    } catch (error) {
+        return res.status(500).json({ success: false, error: "INTERNAL_SERVER_ERROR" });
+    }
+};
+
+module.exports = { checkSystemStatus, activateSystem, getLicenseWidgetData };
