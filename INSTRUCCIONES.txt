@@ -1,0 +1,364 @@
+
+
+( PARA CONOCER LA ESTRUCTURA Y EXPLICACION DEL CODIGO CONTENIDO EN ESTA
+CARPETA DIRIGETE A LA LINEA:  ) 
+
+
+
+------------------------ INSTRUCCIONES ------------------------
+
+SIGUE LOS PASOOOOS ====>
+
+----> Incruztación de carpeta License en tu proyecto
+
+PASO 0.  La carpeta "License" debe incluirse en el backend de tu proyecto, dentro de 
+    tu carpeta "src" A NIVEL DE TU CARPETA "Controllers"
+
+
+----> preparación de entorno
+PASO 1. Asegurate de crear la tabla system_config en la base de datos que utilizas 
+        en tu software. Ejecuta el siguiente script:
+
+        CREATE TABLE system_config (
+            id INT PRIMARY KEY IDENTITY(1,1),
+            sys_token_a VARCHAR(MAX), 
+            sys_token_b VARCHAR(MAX),
+            sys_auth_key VARCHAR(MAX), 
+            last_sync DATETIME DEFAULT GETDATE(), 
+            sys_token_c VARCHAR(MAX), 
+            sys_token_d VARCHAR(MAX), 
+            sys_token_e VARCHAR(MAX) 
+        );
+
+
+PASO 2. Dentro de la carepta License. Dirigete al archivo "db-local.js" dentro de la carpeta "config". 
+        verifica que las contraseñas de tu base de datos usada en tu software
+        esten en tu archivo .env a nivel del backend, de lo contrario
+        tienes total libertad de apuntar al archivo que las contenga, o si prefieres
+        puedes ingresarlas directamente en el codigo:
+
+        verifica la ruta (linea 9):
+        require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') });
+
+
+        (QUEDA A TOTAL DISPOSICIÓN DEL DESARROLADOR EL MANEJO Y SEGURIDAD DE SUS 
+        PROPIAS CREDENCIALES)
+
+
+        Fragmento de codigo: (archivo db-local.js linea 12)
+
+        const localConfig = {
+            user: process.env.DB_USER,        // Usuario de la BD del cliente
+            password: process.env.DB_PASSWORD, // Password de la BD del cliente
+            server: process.env.DB_SERVER,     // Servidor
+            database: process.env.DB_NAME,     // La BD del software
+            options: {
+                encrypt: false,
+                trustServerCertificate: true
+            }
+        };
+
+        -- EJECUTA EL ARCHIVO "db-local.js" en tu terminal con el comando
+           node db-local.js para probar la conexión, debe aparecer un mensaje:
+           "conected" Ejemplo:
+
+            PS C:\software_formulacion\backend-node\src\license\config> node db-local.js
+            [dotenv@17.2.3] injecting env (14) from ..\..\..\.env -- tip: ⚙️  override existing env vars with { override: true }
+            Conected
+            PS C:\software_formulacion\backend-node\src\license\config> 
+
+
+PASO 3. en tu archivo .env a nivel del backend, ingresa las siguientes variables:
+
+        #SOFTWARE NAME
+        SOFTWARE_NAME=formulacion
+
+        #LICENCIA
+        LICENSE_MASTER_KEY=SIAUmex_prod_A7b!9Kz!Qet43f2198$%54bfhrbew   
+
+        
+        cambia el nombre de tu software según corresponda, recuerda que este nombre 
+        debe coincidir con los nombres asignados para la creación de licencias 
+
+        - formulacion
+        - camionero
+        - conteo
+        - siaumex
+
+        todo en minusculas y sin incluir comillas dobles ni comillas simples (por el momento)
+
+
+----> PRIMER BLOQUEO POR LICENCIA, ANTES DE IR AL PASO 5 PRUEBA EL PASO 4 EN TU SERVIDOR
+
+PASO 4. Busca la carpeta "Archivos-extra" dentro de "License" 
+        Esta carpeta contiene el archivo "syncSystem.js"  el cual contiene el código
+        para bloquear del software mediante licencia.
+        Copia el archivo y pegalo junto a los controladores de tus demás funciones en 
+        la carpeta "controllers" de tu proyecto, si tienes una direfente estructura
+        deberás poner el archivo al mismo nivel de tus archivos que contienen las
+        funciones para el funcionamiento de tu software
+
+        No debes modificar ningún fragmento de código, solo asegurate de tener listo
+        el PASO 3.
+
+        Seguido de eso, en la carpeta "Archivos extra" dentro de "License"
+        copia el archivo "system.routes.js" y pegalo en tu carpeta "routes" 
+        Despues en tu "app.js" (o el archivo principal) de tu proyecto, deberas ingresar la ruta:
+
+        // Ruta para verificar el estado de la licencia y activación manual
+        app.use('/api/system', require('./src/routes/system.routes'));   
+
+        (IMPORTANTE: VERIFICA EL DIRECCIONAMIENTO DEL ARCHIVO EN EL REQUIRE)
+
+        esto habilitará la ruta para activar el software. 
+        
+        deberas crear 2 rutas para este archivo:
+
+        //este se encargara unicamente de devolverte el estatus de la licencia
+            router.get('/status', checkSystemStatus);
+
+        //este se encargara de activar la licencia en el primer uso del software
+            router.post('/activate', activateSystem);
+
+        En tu FRONTEND deberas crear tu propio
+        codigo con tu propio diseño para el ingreso del PRODUCT KEY "XXXX-XXXX-XXXX-XXXX"
+        solo necesitas declarar el uso de la ruta, por ejemplo:
+        
+        const API_URL_REL = import.meta.env.VITE_API_URL + '/system'; 
+        el cual devolvera algo como: "http://localhost:3000/api/system" 
+
+        PUEDES ENCONTRAR un ejemplo del page en el archivo de texto "LicenseGuard.txt"
+        (ubicado dentro license/archivos-extra/LicenseGuard.txt)
+        este contiene el codigo completo del frontend con el uso de la api
+
+        recuerda configurar el LicenseGuard en tu frontend para que sea lo primero que 
+        se valide antes de entrar siquiera al LOGIN
+        
+        HAZ LOS CAMBIOS QUE ENCUENTRES NECESARIOS, LA RUTA DECLARADA ADECÚALA
+        SEGUN TUS REGLAS
+
+
+        NOTAAAAA:::: este archivo syncSystem devuelve los siguientes errores:
+
+        NO_LOCAL_LICENSE : Cuando no se ha activado ninguna licencia 
+        "LICENSE_EXPIRED" : Cuando la licencia que estaba activa ya expiró 
+        "TIME_TAMPERING" : Cuando el usuario manipula su reloj local 
+
+        en tu frontend puedes interceptar estos errores para mostrar diferentes tipos de pantalla
+        de acuerdo al tipo de error.
+
+        EL ERROR "TIME_TAMPERING" lo puedes y debes dejar en tu login. esto para no dejarlo entrar
+        a tu sistema en caso de que el usuario haya alterado su reloj y ganar tiempo de licencia.
+
+
+----> WIDGETS DE ALMACENAMIENTO Y USUARIOS CONECTADOS:
+----> NO PRUEBES ESTO HASTA NO TENER TU LICENCIA INSERTADA EN TU BD.
+
+PASO 5. EN LA CARPETA ARCHIVOS EXTRA ENCUENTRA EL ARCHIVO "storageWidgetController.js" y pegalo
+        en la carpeta controllers de tu proyecto.
+        CREA su respectiva ruta en tu carpeta de rutas y crea la ruta en app.js ejemplo:
+        
+        //carpeta routes:
+        router.get('/', storageWidgetController.getStorageWidgetData)
+        
+        //app.js
+        app.use('/api/storage', require('./src/routes/storageWidget.routes'));
+
+        ejecutalo en postman para verificar su funcionalidad
+        te devolverá un json con la siguiente estructura:
+
+        data : {
+            usedMB: 4.00, //lo que tengas de espacio usado en tu bd
+            limitMB: 512, //el limite de MB que se le asigno en la licencia
+            porcentaje: 0.2 //el porcentaje usado
+        }
+
+        usa ese json en tu frontend para mostrar los datos como un widget de barra de progreso
+        PUEDES USAR ESTOS DATOS PARA MANDAR ALERTAS O NOTIFICACIONES POR FALTA DE ESPACIO ETC ETC.
+
+
+PASO 6. EN LA MISMA CARPETA DE ARCHIVOS EXTRA ENCUENTRA EL ARCHIVO "userWidget.controller.js" y pegalo
+        en tu carpeta controllers, repite el mismo proceso del paso 5.
+
+        estp te devolvera el siguiente json :
+
+        data:{
+            usoActual: 1, //usuarios activos o con sesion iniciada 
+            limite: 10, //limite de usuarios
+        }
+
+        USA ESOs datos para mostrarlos en forma de widget en tu frontend
+
+
+----> RESTRICCION POR CUPO DE USUARIOS. 
+
+PASO 7. DIRIJETE A TU ARCHIVO DEL BACKEND DONDE HACES Y VALIDAS EL LOGIN.
+
+        AGREGA ESTE CONST AL INICIO DEL ARCHIVO:
+        const LicenseManager = require('../license');
+
+        DESPUES DE TUS VALIDACIONES Y ANTES DE DEJAR ENTRAR AL USUARIO INGRESA ESTE CODIGO:
+
+        // 5. NUEVO: VALIDACIÓN Y CONTROL DE ASIENTOS CONCURRENTES
+        
+        // A) Obtenemos la identidad local (para sacar el licclie)
+        const identity = await LicenseManager.getLocalIdentity();
+        if (!identity || !identity.licclie) {
+            return res.status(403).json({ detail: 'Error de configuración: No se encontró una licencia local activa.' });
+        }
+
+        // B) EL CADENERO DEL TIEMPO 
+        const timeCheck = await LicenseManager.verifyTime();
+        if (!timeCheck.isValid) {
+            // Personalizamos el mensaje dependiendo de la trampa o error
+            let errorMsg = 'Error en la validación de seguridad de la licencia.';
+            
+            if (timeCheck.error === "LICENSE_EXPIRED") {
+                errorMsg = 'Tu licencia ha expirado. Por favor, renuévala en tu panel de administración.';
+            } else if (timeCheck.error === "TIME_TAMPERING") {
+                errorMsg = 'Se detectó una alteración en el reloj del sistema. Acceso bloqueado por seguridad.';
+            } else if (timeCheck.error === "LICENSE_NEEDS_SYNC") {
+                errorMsg = 'La licencia necesita sincronizarse. Por favor, vuelve a activarla.';
+            }
+            
+            return res.status(403).json({ detail: errorMsg });
+        }
+
+        // C) Validamos y ocupamos el asiento (Solo si el cadenero lo dejó pasar)
+        const seatResult = await LicenseManager.loginCheck(identity.licclie, softwareName);
+
+        if (!seatResult.isValid) {
+            if (seatResult.error === "MAX_SESSIONS_REACHED") {
+                return res.status(403).json({ detail: 'Límite de usuarios permitidos alcanzado.' });
+            }
+            // Si el error es otro (inactiva, etc.)
+            return res.status(403).json({ detail: 'La licencia del sistema no es válida, se encuentra inactiva o ha expirado.' });
+        }
+
+        NOTA: ADECÚA EL CODIGO SEGUN TUS VALIDACIONES.
+
+        este codigo debe permitir mandar distintos mensajes de acuerdo al estatus:
+        se enfoca principalmente en mandar el mensaje de "Límite de usuarios permitidos alcanzado."
+
+        
+        
+PASO 8. DIRÍGETE A LA RUTA O CONTROLADOR DONDE MANEJAS EL CIERRE DE SESIÓN (LOGOUT).
+        
+        
+        ASEGÚRATE DE TENER IMPORTADO EL MANAGER AL INICIO DEL ARCHIVO:
+        const LicenseManager = require('../license'); // (Ajusta los '../' según tu estructura)
+
+        DENTRO DE TU FUNCIÓN DE LOGOUT, JUSTO ANTES DE DESTRUIR EL TOKEN O LA SESIÓN, AGREGA ESTO:
+
+        // 1. OBTENEMOS LA IDENTIDAD LOCAL
+        const identity = await LicenseManager.getLocalIdentity();
+        
+        if (identity && identity.licclie) {
+            const softwareName = process.env.SOFTWARE_NAME;
+            
+            // 2. LIBERAMOS EL ASIENTO EN LA NUBE
+            await LicenseManager.logoutCheck(identity.licclie, softwareName);
+        }
+
+        // 3. AHORA SÍ, DESTRUYE LA SESIÓN O TOKEN DEL USUARIO COMO LO HACES NORMALMENTE
+        // res.clearCookie('token');
+        // res.status(200).json({ message: "Sesión cerrada correctamente" });
+
+        NOTA IMPORTANTÍSIMA: Esta función DEBE ejecutarse siempre que un usuario cierre sesión manualmente.
+        Si no liberan el asiento (`LicUso`), el límite de usuarios de la licencia colapsará en un par de días.
+
+
+----> RESTRICCION DE INSERCIONES POR FALTA DE ESPACIO verifyStorage (el más fácil)
+
+PASO 9. ENTRA A CUALQUIER RUTA (DE TU CARPETA ROUTES O EL LUGAR DONDE MANEJES LAS RUTAS)
+
+        Y SELECCIONA UN ARCHIVO DONDE HAYA RUTAS 'POST', 'PUT' o 'PATCH' por ejemplo:
+
+            operadores.routes.js:
+            
+            // GET /api/operadores
+            router.get('/', getOperadores);
+
+            //protecccion contra almacenamiento
+            // POST /api/operadores
+            router.post('/', createOperador);
+
+            // PUT /api/operadores/:id (Actualizar por RFID)
+            router.put('/:id', updateOperador);
+
+        AL INICIO DE TU ARCHIVO COLOCA LA SIGUIENTE CONSTANTE:
+        
+        const { verifyStorage } = require('../license/middlewares/verifyStorage.js')
+        
+        ESTA CONSTANTE te va a permitir validar el almacenamiento antes de realizar cualquier peticion post 
+        o cualquier insercion 
+        para eso debes simplemente poner "verifyStorage" antes de ejecutar tu función de inserción. POR EJEMPLO:
+
+        // POST /api/operadores ⬇️
+            router.post('/', verifyStorage ,createOperador);
+
+        // PUT /api/operadores/:id (Actualizar por RFID)
+                                    ⬇️
+            router.put('/:id', verifyStorage ,updateOperador);
+
+        observa el antes y el despues para que no haya errores. 
+
+        HAZ ESTO CON TODAS TUS RUTAS CON PETICION POST, PUT O PATCH
+        REALIZA LAS EXCEPCIONES QUE CONSIDERES NECESARIAS (borrados lógicos)
+        NOOOO PONGAS ESTA CONSTANTE EN PETICIONES 'GET'
+
+
+PASO 10. PRUEBA TODAS LAS FUNCIONES DE LA LICENCIA INTEGRADA A TU SOFTWARE
+
+        - RECUERDA PROBAR PRIMERO EN POSTMAN
+        - RECUERDA QUE CADA FUNCION ES UNA API Y TE DEBE MANDAR RESULTADOS EN JSON
+          DEBES INTERCEPTAR ESOS RESULTADOS Y MOSTRAR YA SEA MENSAJES DE ERROR O INFORMACION
+          EN TU SISTEMA.
+
+
+
+EXPLICACION DE CODIGO (README)
+
+|- Carpeta "Licese" - carpeta principal
+    |-- Carpeta "config"
+    |    |-- crypto.js:
+    |    |    "Este codigo se encargara de encriptar y desencriptar las 
+    |    |    credenciales de la base de datos central donde se gestionan
+    |    |    todas las licencias, ademas de encriptar los datos que se 
+    |    |    guardaran de manera local en la base de datos que usa tu 
+    |    |    propio software, se utiliza el algoritmo 'aes-256-cbc'".
+    |    |
+    |    |-- db-license.js:
+    |    |    " este archivo tiene como unico proposito la conexión a la 
+    |    |    base de datos central. No se deberá modificar, ya que las
+    |    |    llaves usadas ya se encuentran generadas".
+    |    |
+    |    |-- db-local.js: 
+    |    |    "conexion a tu base de datos local para la ubicacion de la tabla "sys_config"
+    |    |    que debiste crear anteriormente"
+    |    |
+    |    |-- vault.json:
+    |    |    "contiene las contraseñas de la bd central de manera encriptada.
+    |    |    NO MODIFICAR. ya tendra incluida las contraseñas correctas 
+    |-- Carpeta "core"
+    |    |-- auth.js:
+    |    |    "este archivo tiene como proposito validar si la licencia del usuario esta 
+    |    |    activa, si  no a expirado, ademas de obtener las sesiones activas en el momento
+    |    |    para las debidas restricciones segun el plan de licencian".
+    |    |
+    |    |-- limits.js:
+    |    |   "Este es el 'Cadenero del Tiempo'. Contiene la lógica matemática (timeGuard) 
+    |    |   que convierte las fechas a números enteros (YYYYMMDD) para evitar bugs de 
+    |    |   zonas horarias. Se encarga de bloquear el sistema si la licencia ya expiró 
+    |    |   o si detecta que el usuario intentó hacer trampa alterando el reloj de su PC. Además de tener las funciones para obtener y limitar las inserciones segun a capacidad de la bd y la licencia"
+    |    |
+    |    |-- persistence.js:
+    |    |   "Se encarga exclusivamente de las lecturas y escrituras hacia tu tabla local 
+    |    |   'system_config'. Guarda, actualiza y extrae los tokens encriptados sin que 
+    |    |   el resto del sistema tenga que lidiar con SQL directo."
+    |    |
+    |-- Carpeta "middlewares"
+    |    |-- verifyStorage.js:
+    |    |   "El guardaespaldas de la base de datos. Se coloca en tus rutas POST, PUT o 
+    |    |   PATCH. Calcula cuánto pesa tu BD actualmente y si rebasa el límite de MB 
+    |    |   permitido en la licencia, bloquea la inserción de nuevos datos."

@@ -1,0 +1,221 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import {
+    LucideKeyRound as Key, 
+    Loader2,
+    Lock,
+    Unlock,
+    AlertTriangle,
+    ShieldCheck,
+    Globe
+} from 'lucide-react';
+
+const LicenseGuard = ({ children }) => {
+    const [isActivated, setIsActivated] = useState(null);
+    const [licenciaBlocks, setLicenciaBlocks] = useState(['', '', '', '']);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [supportInfo, setSupportInfo] = useState({ email: '', phone: '' });
+    const [lockReason, setLockReason] = useState(null);
+
+    const [modalState, setModalState] = useState({
+        isOpen: false,
+        status: 'idle',
+        message: '',
+        title: ''
+    });
+
+    const inputRefs = [useRef(null), useRef(null), useRef(null), useRef(null)];
+    const API_URL_REL = import.meta.env.VITE_API_URL + '/system';
+
+    useEffect(() => {
+        checkStatus();
+        const handleLicenseError = (e) => {
+            setIsActivated(false);
+            if (e.detail) {
+                setError(e.detail);
+                setLockReason(e.detail);
+            }
+        };
+        window.addEventListener('license-expired', handleLicenseError);
+        return () => window.removeEventListener('license-expired', handleLicenseError);
+    }, []);
+
+    const checkStatus = async () => {
+        try {
+            const { data } = await axios.get(`${API_URL_REL}/status`);
+            if (data.activated) {
+                setIsActivated(true);
+                setLockReason(null);
+            } else {
+                setIsActivated(false);
+                setSupportInfo(data.support);
+                const errorMessages = {
+                    "LICENSE_EXPIRED": "Su licencia ha expirado. Por favor, renueve su suscripción para continuar.",
+                    "TIME_TAMPERING": "Se detectó una alteración en el reloj del sistema. Acceso bloqueado por seguridad.",
+                    "LICENSE_INACTIVE_IN_CENTRAL": "Esta licencia ha sido desactivada desde el panel de control."
+                };
+                if (data.reason !== "NO_LOCAL_LICENSE") {
+                    setLockReason(errorMessages[data.reason] || "Estado de licencia inválido.");
+                } else {
+                    setLockReason(null);
+                }
+            }
+        } catch (err) {
+            setIsActivated(false);
+            setError("No se pudo establecer conexión con el servidor de validación.");
+        }
+    };
+
+    const handleInputChange = (index, value) => {
+        const cleanValue = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 4);
+        const newBlocks = [...licenciaBlocks];
+        newBlocks[index] = cleanValue;
+        setLicenciaBlocks(newBlocks);
+        if (cleanValue.length === 4 && index < 3) inputRefs[index + 1].current.focus();
+    };
+
+    const handleKeyDown = (index, e) => {
+        if (e.key === 'Backspace' && licenciaBlocks[index] === '' && index > 0) {
+            inputRefs[index - 1].current.focus();
+        }
+    };
+
+    const handlePaste = (e) => {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+        if (pastedData) {
+            const newBlocks = ['', '', '', ''];
+            for (let i = 0; i < 4; i++) {
+                newBlocks[i] = pastedData.substring(i * 4, (i + 1) * 4);
+            }
+            setLicenciaBlocks(newBlocks);
+            const focusIdx = Math.min(Math.floor((pastedData.length - 1) / 4), 3);
+            if (focusIdx >= 0) inputRefs[focusIdx].current.focus();
+        }
+    };
+
+    const handleActivate = async (e) => {
+        e.preventDefault();
+        if (licenciaBlocks.some(block => block.length < 4)) {
+            setModalState({ isOpen: true, status: 'error', title: 'Entrada Inválida', message: "La clave debe tener 16 caracteres alfanuméricos." });
+            return;
+        }
+        setLoading(true);
+        setModalState({ isOpen: true, status: 'loading', title: 'Verificando', message: 'Validando credenciales con el servidor central...' });
+        try {
+            const { data } = await axios.post(`${API_URL_REL}/activate`, { licencia: licenciaBlocks.join('-') });
+            if (data.success) {
+                setModalState({ isOpen: true, status: 'success', title: 'Sistema Activado', message: 'La licencia se ha validado correctamente.' });
+                setTimeout(() => setIsActivated(true), 2000);
+            }
+        } catch (err) {
+            setModalState({ isOpen: true, status: 'error', title: 'Error de Validación', message: err.response?.data?.message || "La licencia no es válida o expiró." });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (isActivated === null) return null;
+    if (isActivated === false) {
+        return (
+            <div style={styles.container}>
+                {modalState.isOpen && (
+                    <div style={styles.modalOverlay}>
+                        <div style={styles.modalBox}>
+                            <div style={styles.iconBox}>
+                                {modalState.status === 'loading' && <Loader2 size={40} className="animate-spin" color="#64748b" />}
+                                {modalState.status === 'success' && <Unlock size={40} color="#10b981" />}
+                                {modalState.status === 'error' && <AlertTriangle size={40} color="#ef4444" />}
+                            </div>
+                            <h3 style={styles.modalTitle}>{modalState.title}</h3>
+                            <p style={styles.modalText}>{modalState.message}</p>
+                            {modalState.status === 'error' && <button onClick={() => setModalState({isOpen:false})} style={styles.modalBtn}>Cerrar</button>}
+                        </div>
+                    </div>
+                )}
+
+                <div style={styles.card}>
+                    <div style={styles.sidebar}>
+                        <div style={styles.sideBrand}>
+                            <ShieldCheck size={48} color="#ffffff" strokeWidth={1.5} />
+                            <h1 style={styles.sideTitle}>CONTROL DE ACCESO</h1>
+                        </div>
+                        <div style={styles.sideMeta}>
+                            <div style={styles.metaItem}><Globe size={14} /> <span>Validación Cloud Activa</span></div>
+                            <p style={styles.version}>v2026.1.0_PRO</p>
+                        </div>
+                    </div>
+
+                    <div style={styles.content}>
+                        <h2 style={styles.mainTitle}>{lockReason ? 'Renovación de Servicio' : 'Activación del Sistema'}</h2>
+                        
+                        {lockReason ? (
+                            <div style={styles.alertBox}>
+                                <p><strong>Restricción de acceso:</strong> {lockReason}</p>
+                            </div>
+                        ) : (
+                            <p style={styles.desc}>Ingrese su identificador de producto de 16 dígitos para habilitar las funciones del software.</p>
+                        )}
+
+                        <form onSubmit={handleActivate}>
+                            <div style={styles.inputLabel}>PRODUCT KEY</div>
+                            <div style={styles.inputRow} onPaste={handlePaste}>
+                                {licenciaBlocks.map((block, i) => (
+                                    <React.Fragment key={i}>
+                                        <input
+                                            ref={inputRefs[i]}
+                                            style={styles.input}
+                                            value={block}
+                                            onChange={(e) => handleInputChange(i, e.target.value)}
+                                            onKeyDown={(e) => handleKeyDown(i, e)}
+                                            placeholder="0000"
+                                        />
+                                        {i < 3 && <span style={styles.dash}>-</span>}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                            <button type="submit" disabled={loading} style={styles.submitBtn}>
+                                {loading ? 'PROCESANDO...' : (lockReason ? 'ACTUALIZAR LICENCIA' : 'ACTIVAR AHORA')}
+                            </button>
+                        </form>
+
+                        <div style={styles.footer}>
+                            <p>Soporte Técnico: {supportInfo.email || 'admin@sistema.com'}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+    return children;
+};
+
+const styles = {
+    container: { height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9', fontFamily: 'Inter, system-ui, sans-serif' },
+    card: { display: 'flex', width: '800px', height: '450px', background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' },
+    sidebar: { width: '35%', background: '#1e293b', padding: '40px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', color: '#fff' },
+    sideBrand: { textAlign: 'center', marginTop: '40px' },
+    sideTitle: { fontSize: '14px', letterSpacing: '2px', marginTop: '20px', opacity: 0.8 },
+    sideMeta: { borderTop: '1px solid #334155', paddingTop: '20px' },
+    metaItem: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#94a3b8', marginBottom: '8px' },
+    version: { fontSize: '10px', color: '#475569' },
+    content: { width: '65%', padding: '50px', display: 'flex', flexDirection: 'column' },
+    mainTitle: { fontSize: '22px', fontWeight: '700', color: '#0f172a', marginBottom: '10px' },
+    desc: { fontSize: '14px', color: '#64748b', lineHeight: '1.5', marginBottom: '30px' },
+    alertBox: { background: '#fef2f2', borderLeft: '4px solid #ef4444', padding: '15px', borderRadius: '4px', marginBottom: '30px', fontSize: '13px', color: '#991b1b' },
+    inputLabel: { fontSize: '11px', fontWeight: '700', color: '#94a3b8', marginBottom: '8px' },
+    inputRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '40px' },
+    input: { width: '100%', height: '45px', border: '1px solid #e2e8f0', borderRadius: '6px', textAlign: 'center', fontSize: '16px', fontWeight: '600', outline: 'none', transition: 'border-color 0.2s' },
+    dash: { color: '#cbd5e1' },
+    submitBtn: { width: '100%', height: '45px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' },
+    footer: { marginTop: 'auto', fontSize: '12px', color: '#94a3b8', textAlign: 'center' },
+    modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
+    modalBox: { background: '#fff', padding: '30px', borderRadius: '12px', width: '350px', textAlign: 'center' },
+    iconBox: { marginBottom: '20px', display: 'flex', justifyContent: 'center' },
+    modalTitle: { fontSize: '18px', fontWeight: '700', marginBottom: '10px' },
+    modalText: { fontSize: '14px', color: '#64748b', marginBottom: '20px' },
+    modalBtn: { padding: '8px 20px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }
+};
+
+export default LicenseGuard;
